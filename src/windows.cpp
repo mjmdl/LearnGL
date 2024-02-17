@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include <stdio.h>
+
 #include <windows.h>
 #include <GL/gl.h>
 
@@ -12,19 +15,52 @@
 #define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
 
 #define USE_MODERN_OPENGL 1
+#define MAIN_LOOP_HERTZ 60
+#define MAIN_LOOP_FRAME_TIME (1.0f / (float)MAIN_LOOP_HERTZ)
 
 namespace windows {
 	static constexpr const char *WindowName = "Learn OpenGL";
 	static constexpr const char *WindowClassName = "LearnGL";
 
+	static uint64_t processor_frequency;
+
+	static inline uint64_t get_ticks(void);
+
+	static inline int64_t get_cycles(void);
+
+	static inline float get_delta_time(
+			uint64_t start_ticks, uint64_t end_ticks);
+	
 	static LRESULT CALLBACK window_callback(
 			HWND window, UINT message,
 			WPARAM w_param, LPARAM l_param);
 }
 	
+static inline uint64_t windows::get_ticks(void)
+{
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter(&counter);
+	return counter.QuadPart;
+}
+
+static inline int64_t windows::get_cycles(void)
+{
+	int64_t cycles = __rdtsc();
+	return cycles;
+}
+
+static inline float windows::get_delta_time(
+		uint64_t start_ticks, uint64_t end_ticks)
+{
+	float delta = (float)(end_ticks - start_ticks);
+	float time = (delta / processor_frequency);
+	return time;
+}
+
 static LRESULT CALLBACK windows::window_callback(
 		HWND window, UINT message,
-		WPARAM w_param, LPARAM l_param) {
+		WPARAM w_param, LPARAM l_param)
+{
 	switch (message) {
 	case WM_CLOSE:
 		DestroyWindow(window);
@@ -41,7 +77,20 @@ static LRESULT CALLBACK windows::window_callback(
 
 int APIENTRY WinMain(
 		HINSTANCE instance, HINSTANCE previous_instance,
-		LPSTR command_line, int command_show) {
+		LPSTR command_line, int command_show)
+{
+	{
+		LARGE_INTEGER performance_frequency;
+		QueryPerformanceFrequency(&performance_frequency);
+		windows::processor_frequency = performance_frequency.QuadPart;
+	}
+
+	uint64_t last_ticks = windows::get_ticks();
+	int64_t last_cycles = windows::get_cycles();
+
+	uint32_t scheduler_ms = 1;
+	bool sleep_is_granular = (timeBeginPeriod(scheduler_ms) != TIMERR_NOERROR);	
+	
 	WNDCLASSEXA window_class = {};
 	window_class.cbSize = sizeof(window_class);
 	window_class.style = CS_OWNDC;
@@ -203,6 +252,49 @@ int APIENTRY WinMain(
 #endif
 		
 		SwapBuffers(device_context);
+
+		/* NOTE: Fixed the frame rate. */
+		{
+			uint64_t test_ticks = windows::get_ticks();
+			float test_delta = windows::get_delta_time(last_ticks, test_ticks);
+			float work_delta = test_delta;
+
+			/* NOTE: Wait untill end of frame. */
+			while (work_delta < MAIN_LOOP_FRAME_TIME) {
+				if (sleep_is_granular) {
+					uint32_t time_left = (uint32_t)(1000.0f * (MAIN_LOOP_FRAME_TIME - work_delta));
+
+					/* NOTE: Sleep while it can */
+					if (time_left > 0) {
+						Sleep(time_left);
+					}
+				}
+
+				/* NOTE: Melt the time left the sleep couldn't wait. */
+				while (work_delta < MAIN_LOOP_FRAME_TIME) {
+					uint64_t ticks = windows::get_ticks();
+					work_delta = windows::get_delta_time(last_ticks, ticks);
+				}
+			}
+
+			uint64_t end_ticks = windows::get_ticks();
+			float frame_miliseconds = (1000.0f * windows::get_delta_time(last_ticks, end_ticks));
+			last_ticks = end_ticks;
+
+			int64_t end_cycles = windows::get_cycles();
+			int64_t delta_cycles = (end_cycles - last_cycles);
+			last_cycles = end_cycles;
+
+			float second_frames = (1000.0f / frame_miliseconds);
+			float frame_megacycles = ((float)delta_cycles / 1'000'000.0f);
+
+			char performance_log[256];
+			sprintf_s(
+					performance_log, sizeof(performance_log),
+					"%.2f FPS | %.2f MS | %.2f MHz\n",
+					second_frames, frame_miliseconds, frame_megacycles);
+			OutputDebugStringA(performance_log);
+		}
 	}
 
 	return (int)message.wParam;
