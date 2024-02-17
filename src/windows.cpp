@@ -210,11 +210,16 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE previous_instance, LPSTR comm
 	UpdateWindow(window);
 
 	{
-		f32 triangle_vertices[] = {
+		f32 rectangle_vertices[] = {
 			// x      y     z     r     g     b
- 			 0.0f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f,
-			-0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,
-			 0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f
+			 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 0.0f, // top right
+			 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+			-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom left
+ 			-0.5f,  0.5f, 0.0f, 1.0f, 0.0f, 1.0f, // top left
+		};
+		u32 rectangle_indices[] = {
+			0, 1, 3, // first triangle
+			1, 2, 3, // second triangle
 		};
 
 		u32 vertex_array;
@@ -224,13 +229,18 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE previous_instance, LPSTR comm
 		u32 vertex_buffer;
 		glGenBuffers(1, &vertex_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_vertices), triangle_vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(rectangle_vertices), rectangle_vertices, GL_STATIC_DRAW);
 
+		u32 element_array;
+		glGenBuffers(1, &element_array);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_array);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rectangle_indices), rectangle_indices, GL_STATIC_DRAW);
+		
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, (6 * sizeof(f32)), (void *)0);
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, (6 * sizeof(f32)), (void *)(3 * sizeof(f32)));
-		
+
 		u32 vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 		glShaderSource(vertex_shader, 1, &vertex_shader_source, nullptr);
 		glCompileShader(vertex_shader);
@@ -294,7 +304,7 @@ int APIENTRY WinMain(HINSTANCE instance, HINSTANCE previous_instance, LPSTR comm
 		
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 		
 #if !USE_MODERN_OPENGL
 		/* Render RGB triangle  */
