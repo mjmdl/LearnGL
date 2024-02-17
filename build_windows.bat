@@ -11,5 +11,5 @@ IF %ErrorLevel% NEQ 0 (
 IF NOT EXIST build MKDIR build
 
 PUSHD build
-cl %cflags% /DLEARNGL_DEBUG=1 /DLEARNGL_DEVELOP /FeLearnGL /Fmlearn_gl.map /FC /Z7 ..\src\windows.cpp /link %lflags%
+cl %cflags% /DLEARNGL_DEBUG=1 /DLEARNGL_DEVELOP /Fewindows_learngl /Fmwindows_learngl.map /FC /Z7 ..\src\windows.cpp /link %lflags%
 POPD
